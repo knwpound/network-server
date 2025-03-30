@@ -22,6 +22,10 @@ const UserSchema = new mongoose.Schema({
         enum: ['user', 'admin'],
         default: 'user'
     },
+    profileColor:{
+        type:String,
+        default: 'lightgray',
+    },
     password: {
         type: String,
         required: [true, 'Please add a password'],
