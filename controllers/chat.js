@@ -67,3 +67,24 @@ exports.fetchChats = async (req, res) => {
         res.status(400).json({ success: false });
     }
 };
+
+//@desc Get single chat
+//@route GET /api/v1/chat/:id
+//@access Public
+exports.getChat=async(req,res,next)=>{
+    console.log("Getting chat with ID:", req.params.id);
+    try{
+        
+        const chat = await Chat.findById(req.params.id);
+
+        if(!chat)
+            return res.status(400).json({success:false});
+
+        res.status(200).json({success:true, data:chat});
+
+    }catch(err){
+        
+        res.status(400).json({success:false});
+    }
+    
+}
