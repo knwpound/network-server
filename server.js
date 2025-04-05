@@ -24,8 +24,13 @@ app.use(cors({
 
 const auth = require('./routes/auth');
 const user = require('./routes/user');
+const chat = require('./routes/chat');
+const message = require('./routes/message');
+
 app.use('/api/v1/auth',auth);
 app.use('/api/v1/users',user);
+app.use('/api/v1/chat',chat);
+app.use('/api/v1/message',message);
 
 const PORT = process.env.PORT || 5000;
 const server = app.listen(
