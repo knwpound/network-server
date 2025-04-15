@@ -57,11 +57,16 @@ exports.fetchChats = async (req, res) => {
               }
             : {};
 
-        const query = {
-            users: { $elemMatch: { $eq: req.user._id } },
-            ...searchFilter,
-        };
-
+            const query = {
+                $or: [
+                  { isGroupChat: true }, // all group chats
+                  {
+                    isGroupChat: false, // non-group chats with current user
+                    users: { $elemMatch: { $eq: req.user._id } },
+                  },
+                ],
+                ...searchFilter, // apply search filter (if any) on group chats
+              };
         Chat.find(query)
             .populate("users", "-password")
             .populate("groupAdmin", "-password")
@@ -110,11 +115,11 @@ exports.createGroupChat = async(req,res,next)=>{
 
     var users = JSON.parse(req.body.users);
 
-    if(users.length<2){
+    if(users.length<1){
         return res.status(400).json({success:false, message:"More than 2 users are required to form a group chat"});
     }
 
-    users.push(req.user);
+
 
     try{
         const groupChat = await Chat.create({

@@ -11,9 +11,13 @@ exports.getUsers = async (req, res, next) => {
     removeFields.forEach((param) => delete reqQuery[param]);
 
     if (req.query.search) {
-        reqQuery.name = { $regex: `^${req.query.search}`, $options: "i" }; 
+        const escapedSearch = req.query.search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        reqQuery.name = { $regex: escapedSearch, $options: "i" };
     }
-
+    if (req.query.exclude) {
+        const excludeId = req.query.exclude;
+        reqQuery._id = { $ne: excludeId };
+    }
     // Create query string
     let queryStr = JSON.stringify(reqQuery);
     queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, (match) => `$${match}`);
@@ -27,7 +31,7 @@ exports.getUsers = async (req, res, next) => {
             const fields = req.query.select.split(",").join(" ");
             query = query.select(fields);
         }
-
+   
         // Sorting
         if (req.query.sort) {
             const sortBy = req.query.sort.split(",").join(" ");
