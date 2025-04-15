@@ -50,7 +50,19 @@ exports.accessChat = async(req,res)=>{
 
 exports.fetchChats = async (req, res) => {
     try {
-        Chat.find({ users: { $elemMatch: { $eq: req.user._id } } })
+        const searchFilter = req.query.search
+            ? {
+                  isGroupChat: true,
+                  chatName: { $regex: `^${req.query.search}`, $options: "i" },
+              }
+            : {};
+
+        const query = {
+            users: { $elemMatch: { $eq: req.user._id } },
+            ...searchFilter,
+        };
+
+        Chat.find(query)
             .populate("users", "-password")
             .populate("groupAdmin", "-password")
             .populate("latestMessage")
@@ -58,15 +70,17 @@ exports.fetchChats = async (req, res) => {
             .then(async (results) => {
                 results = await User.populate(results, {
                     path: "latestMessage.sender",
-                    select: "name email profileColor"
+                    select: "name email profileColor",
                 });
 
-                res.status(200).json({ success: true, data: results });
+                res.status(200).json({ success: true, count:results.length ,data: results });
             });
     } catch (error) {
-        res.status(400).json({ success: false });
+        console.error("Error fetching chats:", error);
+        res.status(400).json({ success: false, message: "Failed to fetch chats" });
     }
 };
+
 
 //@desc Get single chat
 //@route GET /api/v1/chat/:id

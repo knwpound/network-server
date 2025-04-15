@@ -7,8 +7,12 @@ exports.getUsers = async (req, res, next) => {
     const reqQuery = { ...req.query };
 
     // Fields to exclude
-    const removeFields = ["select", "sort", "page", "limit"];
+    const removeFields = ["select", "sort", "page", "limit", "search"];
     removeFields.forEach((param) => delete reqQuery[param]);
+
+    if (req.query.search) {
+        reqQuery.name = { $regex: `^${req.query.search}`, $options: "i" }; 
+    }
 
     // Create query string
     let queryStr = JSON.stringify(reqQuery);
@@ -37,10 +41,11 @@ exports.getUsers = async (req, res, next) => {
         const limit = parseInt(req.query.limit, 10) || 25;
         const startIndex = (page - 1) * limit;
         const endIndex = page * limit;
-        const total = await User.countDocuments();
+        const total = await User.countDocuments(JSON.parse(queryStr));
+
 
         query = query.skip(startIndex).limit(limit);
-        const users = await query; // ✅ รอ `await` ตอนดึงข้อมูล
+        const users = await query; 
 
         // Pagination result
         const pagination = {};
