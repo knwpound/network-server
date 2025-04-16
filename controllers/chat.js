@@ -117,9 +117,11 @@ exports.createGroupChat = async(req,res,next)=>{
 
     var users = JSON.parse(req.body.users);
 
-    if(users.length<1){
+    if(users.length<2){
         return res.status(400).json({success:false, message:"More than 2 users are required to form a group chat"});
     }
+
+    users.push(req.user);
 
     try{
         const groupChat = await Chat.create({
