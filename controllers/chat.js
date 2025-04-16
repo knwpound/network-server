@@ -59,7 +59,9 @@ exports.fetchChats = async (req, res) => {
 
             const query = {
                 $or: [
-                  { isGroupChat: true }, // all group chats
+                  { isGroupChat: true,
+                    users: { $elemMatch: { $eq: req.user._id } },
+                   }, // all group chats
                   {
                     isGroupChat: false, // non-group chats with current user
                     users: { $elemMatch: { $eq: req.user._id } },
