@@ -1,6 +1,7 @@
 const Message = require("../models/Message"); // ✅ Import Model
 const User = require("../models/User");
 const Chat = require("../models/Chat");
+const { getIO }  = require("../socket");
 
 exports.sendMessage= async(req,res)=>{
     const {content, chatId} = req.body;
@@ -48,3 +49,30 @@ exports.allMessages= async(req,res)=>{
         throw new Error(error.message);
     }
 }
+// make sure this exports your io instance
+
+exports.markMessagesAsRead = async (req, res) => {
+  try {
+ 
+   io=getIO();
+    const chatId = req.params.chatId;
+    const userId = req.user._id;
+
+    // Update all unread messages in this chat
+    const updatedMessages = await Message.updateMany(
+      { chat: chatId, readBy: { $ne: userId } },
+      { $push: { readBy: userId } }
+    );
+
+    // Push real-time update to everyone in this chat
+    io.to(chatId).emit("messages read", {
+      chatId,
+      readerId: userId,
+    });
+
+    res.status(200).json({ success: true, updatedCount: updatedMessages.modifiedCount });
+  } catch (error) {
+    console.error("Failed to mark messages as read:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};

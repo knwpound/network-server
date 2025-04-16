@@ -119,8 +119,6 @@ exports.createGroupChat = async(req,res,next)=>{
         return res.status(400).json({success:false, message:"More than 2 users are required to form a group chat"});
     }
 
-
-
     try{
         const groupChat = await Chat.create({
             chatName: req.body.name,
@@ -219,4 +217,6 @@ exports.removeFromGroup = async(req,res,next)=>{
         res.status(500).json({ success: false, message: "Server Error", error: error.message });
     }
 }
+
+
 
