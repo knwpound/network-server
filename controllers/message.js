@@ -69,6 +69,7 @@ exports.markMessagesAsRead = async (req, res) => {
       chatId,
       readerId: userId,
     });
+      //console.log("User Joined Room: "+room);
 
     res.status(200).json({ success: true, updatedCount: updatedMessages.modifiedCount });
   } catch (error) {
