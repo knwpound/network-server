@@ -1,4 +1,5 @@
 const User = require("../models/User"); // ✅ Import Model
+const Chat = require('../models/Chat');
 
 exports.getUsers = async (req, res, next) => {
     let query;
@@ -106,18 +107,33 @@ exports.putUser=async(req,res,next)=>{
     }
 }
 
-//@desc delete single user
+
+
+//@desc Delete single user and clean up related chats
 //@route DELETE /api/v1/users/:id
 //@access Public
-exports.deleteUser=async(req,res,next)=>{
-    try{
-        const user= await User.findByIdAndDelete(req.params.id);
-        if(!user)
-            return res.status(404).json({success:false, meassage: `User not found with id of ${req.params.id}`});
-        await User.deleteOne({_id: req.params.id});
+exports.deleteUser = async (req, res, next) => {
+    try {
+        const user = await User.findByIdAndDelete(req.params.id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: `User not found with id of ${req.params.id}`
+            });
+        }
 
-        res.status(200).json({success:true,data:{}});
-    }catch(err){
-        res.status(400).json({success:false});
+        // 1. Pull user from all chats
+        await Chat.updateMany(
+            { users: req.params.id },
+            { $pull: { users: req.params.id } }
+        );
+
+        // 2. Delete chats where no users remain
+        await Chat.deleteMany({ users: { $size: 1 } });
+
+        res.status(200).json({ success: true, data: {} });
+    } catch (err) {
+        console.error("Error deleting user and cleaning up chats:", err);
+        res.status(400).json({ success: false, message: "Failed to delete user." });
     }
-}
+};
