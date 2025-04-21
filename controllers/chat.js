@@ -2,52 +2,48 @@ const Chat = require("../models/Chat");
 const User = require("../models/User");
 const { getIO }  = require("../socket");
 
-exports.accessChat = async(req,res)=>{
-    const {userId}=req.body;
-    if(!userId){
-        console.log("User param not sent with request");
-        return res.status(400).json({success:false});
-    }
+exports.accessChat = async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ success: false, message: "UserId missing" });
+  }
 
-    var isChat = await Chat.find({
-        isGroupChat: false,
-        $and:[
-            {users:{$elemMatch:{$eq:req.user._id}}},
-            {users:{$elemMatch:{$eq:userId}}}
-        ]
-    }).populate("users","-password").populate("latestMessage");
-
-    isChat = await User.populate(isChat,{
-        path:"latestMessage.sender",
-        select: "name email profileColor"
+  try {
+    let isChat = await Chat.find({
+      isGroupChat: false,
+      $and: [
+        { users: { $elemMatch: { $eq: req.user._id } } },
+        { users: { $elemMatch: { $eq: userId } } },
+      ],
     })
+      .populate("users", "-password")
+      .populate("latestMessage");
 
-    if(isChat.length > 0){
-        res.send(isChat[0]);
-    } else {
-        var chatData = {
-            chatName:"sender",
-            isGroupChat: false,
-            users:[req.user._id, userId]
-        };
-       
-        try{
-            const createChat = await Chat.create(chatData);
+    isChat = await User.populate(isChat, {
+      path: "latestMessage.sender",
+      select: "name email profileColor",
+    });
 
-            const FullChat = await Chat.findOne({_id: createChat._id}).populate(
-                "users",
-                "-password"
-            );
-
-            res.status(200).json({success:true, data: FullChat});
-
-        }catch(error){
-            res.status(400).json({success:false});
-            throw new Error(error);
-        }
-
+    if (isChat.length > 0) {
+      return res.status(200).json({ success: true, data: isChat[0] });
     }
+
+    const chatData = {
+      chatName: "sender",
+      isGroupChat: false,
+      users: [req.user._id, userId],
+    };
+
+    const createdChat = await Chat.create(chatData);
+    const fullChat = await Chat.findById(createdChat._id).populate("users", "-password");
+
+    return res.status(200).json({ success: true, data: fullChat });
+  } catch (error) {
+    console.error("Chat access error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
 };
+
 
 exports.fetchChats = async (req, res) => {
     try {
@@ -214,7 +210,12 @@ exports.addToGroup = async (req, res, next) => {
 
     // ✅ Emit group update event
     const io = getIO();
-    io.to(chatId).emit("group updated", { chatId });
+io.to(chatId).emit("group updated", {
+  chatId,
+  users: updatedChat.users, // this includes the populated users
+});
+
+
 
     return res.status(200).json({
       success: true,
@@ -272,7 +273,11 @@ exports.addToGroup = async (req, res, next) => {
             .populate("users", "-password")
             .populate("groupAdmin", "-password")
         );
-  
+        io.to(chatId).emit("group updated", {
+            chatId,
+            users: updatedChat.users, // this includes the populated users
+          });
+          
       return res.status(200).json({ success: true, data: updatedChat });
     } catch (error) {
       return res.status(500).json({
