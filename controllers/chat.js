@@ -52,41 +52,41 @@ exports.fetchChats = async (req, res) => {
     try {
         const searchFilter = req.query.search
             ? {
-                  isGroupChat: true,
                   chatName: { $regex: `^${req.query.search}`, $options: "i" },
               }
             : {};
 
-            const query = {
-                $or: [
-                  { isGroupChat: true,
+        const query = {
+            $or: [
+                {
+                    isGroupChat: true,
+                    ...searchFilter, // ✅ apply search only to group chats
+                },
+                {
+                    isGroupChat: false,
                     users: { $elemMatch: { $eq: req.user._id } },
-                   }, // all group chats
-                  {
-                    isGroupChat: false, // non-group chats with current user
-                    users: { $elemMatch: { $eq: req.user._id } },
-                  },
-                ],
-                ...searchFilter, // apply search filter (if any) on group chats
-              };
-        Chat.find(query)
+                },
+            ],
+        };
+
+        let results = await Chat.find(query)
             .populate("users", "-password")
             .populate("groupAdmin", "-password")
             .populate("latestMessage")
-            .sort({ updatedAt: -1 })
-            .then(async (results) => {
-                results = await User.populate(results, {
-                    path: "latestMessage.sender",
-                    select: "name email profileColor",
-                });
+            .sort({ updatedAt: -1 });
 
-                res.status(200).json({ success: true, count:results.length ,data: results });
-            });
+        results = await User.populate(results, {
+            path: "latestMessage.sender",
+            select: "name email profileColor",
+        });
+
+        res.status(200).json({ success: true, count: results.length, data: results });
     } catch (error) {
         console.error("Error fetching chats:", error);
         res.status(400).json({ success: false, message: "Failed to fetch chats" });
     }
 };
+
 
 
 //@desc Get single chat
