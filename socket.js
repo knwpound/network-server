@@ -3,7 +3,7 @@ let io;
 
 const initSocket = (server) => {
     io = require("socket.io")(server, {
-      pingTimeout: 60000,
+      pingTimeout: 6000000,
       cors: {
         origin: "http://localhost:3000",
         methods: ["GET", "POST"],
@@ -44,6 +44,7 @@ io.on("connection", (socket)=>{
     if(!chat.users) return console.log('chat.users not defined');
 
     socket.in(chat._id).emit("message recieved", newMessageRecieved)
+    socket.emit("message recieved", newMessageRecieved); 
     //console.log("Reciever recieve",newMessageRecieved);
 
     // chat.users.forEach(user=>{
