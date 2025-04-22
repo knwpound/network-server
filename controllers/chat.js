@@ -190,30 +190,34 @@ exports.createGroupChat = async (req, res, next) => {
     }
   
     try {
-      const updatedChat = await Chat.findByIdAndUpdate(
-        chatId,
-        { chatName },
-        { new: true }
-      )
+      // ✅ Update the chat name
+      await Chat.findByIdAndUpdate(chatId, { chatName });
+  
+      // ✅ Re-fetch full chat with populated users
+      const updatedChat = await Chat.findById(chatId)
         .populate("users", "-password")
         .populate("groupAdmin", "-password");
   
       if (!updatedChat) {
         return res.status(404).json({
           success: false,
-          message: "Chat not found",
+          message: "Chat not found after update",
         });
       }
   
       const io = getIO();
-      io.to(chatId).emit("group renamed", {
+  
+      // ✅ Emit updated users + chatName in your format
+      io.to(chatId).emit("group updated", {
         chatId,
+        users: updatedChat.users,
         chatName: updatedChat.chatName,
       });
   
-      res.status(200).json({ success: true, data: updatedChat });
+      return res.status(200).json({ success: true, data: updatedChat });
     } catch (error) {
-      res.status(500).json({
+      console.error("Rename group error:", error);
+      return res.status(500).json({
         success: false,
         message: "Server Error",
         error: error.message,
@@ -223,79 +227,74 @@ exports.createGroupChat = async (req, res, next) => {
   
 
 
-exports.addToGroup = async (req, res, next) => {
-  const { chatId, userId } = req.body;
-
-  if (!chatId || !userId) {
-    return res.status(400).json({
-      success: false,
-      message: "chatId and userId are required",
-    });
-  }
-
-  try {
-    const chat = await Chat.findById(chatId);
-
-    if (!chat) {
-      return res.status(404).json({
-        success: false,
-        message: "Chat not found",
-      });
-    }
-
-    // ✅ Check if user is already in the group
-    if (chat.users.includes(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: "User already in group",
-      });
-    }
-
-    // ✅ Add user and save
-    chat.users.push(userId);
-    await chat.save();
-
-    // ✅ Re-fetch populated chat
-    const updatedChat = await Chat.findById(chatId)
-      .populate("users", "-password")
-      .populate("groupAdmin", "-password");
-      console.log("📣 Emitting group updated to room:", chatId);
-    // ✅ Emit group update event
-    const io = getIO();
-io.to(chatId).emit("group updated", {
-  chatId,
-  users: updatedChat.users, // this includes the populated users
-});
-
-
-
-    return res.status(200).json({
-      success: true,
-      data: updatedChat,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Server Error",
-      error: error.message,
-    });
-  }
-};
-
-  
-  
-
-  exports.removeFromGroup = async (req, res, next) => {
+  exports.addToGroup = async (req, res, next) => {
     const { chatId, userId } = req.body;
   
     if (!chatId || !userId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "chatId and userId are required" });
+      return res.status(400).json({
+        success: false,
+        message: "chatId and userId are required",
+      });
     }
   
     try {
-      // First, fetch the chat
+      const chat = await Chat.findById(chatId);
+  
+      if (!chat) {
+        return res.status(404).json({
+          success: false,
+          message: "Chat not found",
+        });
+      }
+  
+      if (chat.users.includes(userId)) {
+        return res.status(400).json({
+          success: false,
+          message: "User already in group",
+        });
+      }
+  
+      chat.users.push(userId);
+      await chat.save();
+  
+      const updatedChat = await Chat.findById(chatId)
+        .populate("users", "-password")
+        .populate("groupAdmin", "-password");
+  
+      const io = getIO();
+      io.to(chatId).emit("group updated", {
+        chatId,
+        users: updatedChat.users,
+        chatName: updatedChat.chatName,
+      });
+  
+      return res.status(200).json({
+        success: true,
+        data: updatedChat,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: "Server Error",
+        error: error.message,
+      });
+    }
+  };
+  
+  
+  
+
+exports.removeFromGroup = async (req, res, next) => {
+    const { chatId, userId } = req.body;
+  
+    if (!chatId || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "chatId and userId are required",
+      });
+    }
+  
+    try {
       const chat = await Chat.findById(chatId);
   
       if (!chat) {
@@ -304,18 +303,10 @@ io.to(chatId).emit("group updated", {
           .json({ success: false, message: "Chat not found" });
       }
   
-      // Remove userId from users array
-      chat.users = chat.users.filter(
-        (u) => u.toString() !== userId.toString()
-      );
+      chat.users = chat.users.filter((u) => u.toString() !== userId.toString());
   
-      // If the removed user was the groupAdmin
       if (chat.groupAdmin.toString() === userId.toString()) {
-        if (chat.users.length > 0) {
-          chat.groupAdmin = chat.users[0]; // promote next member as admin
-        } else {
-          chat.groupAdmin = null; // no members left
-        }
+        chat.groupAdmin = chat.users.length > 0 ? chat.users[0] : null;
       }
   
       const updatedChat = await chat
@@ -325,11 +316,14 @@ io.to(chatId).emit("group updated", {
             .populate("users", "-password")
             .populate("groupAdmin", "-password")
         );
-        io.to(chatId).emit("group updated", {
-            chatId,
-            users: updatedChat.users, // this includes the populated users
-          });
-          
+  
+      const io = getIO();
+      io.to(chatId).emit("group updated", {
+        chatId,
+        users: updatedChat.users,
+        chatName: updatedChat.chatName,
+      });
+  
       return res.status(200).json({ success: true, data: updatedChat });
     } catch (error) {
       return res.status(500).json({
@@ -340,6 +334,5 @@ io.to(chatId).emit("group updated", {
     }
   };
   
-
 
 
